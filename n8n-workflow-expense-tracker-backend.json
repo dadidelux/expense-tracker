@@ -1,0 +1,644 @@
+{
+  "name": "expense-tracker-backend",
+  "description": null,
+  "active": true,
+  "nodes": [
+    {
+      "id": "webhook-01",
+      "name": "Webhook",
+      "webhookId": "expense-submit-wh-01",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "expense-submit",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      }
+    },
+    {
+      "id": "mimo-parse-01",
+      "name": "Mimo Parse",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'mimo-v2.5-pro', temperature: 0.1, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: \"You are an expense-parsing assistant for a personal/business expense tracker. Given free-text describing an expense (may be informal, like a receipt summary or a quick note), extract structured data.  Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape: { \\\"date\\\": \\\"YYYY-MM-DD or null if not stated (will default to today)\\\", \\\"merchant\\\": \\\"string, the vendor/payee name\\\", \\\"amount\\\": number (numeric value only, no currency symbol), \\\"currency\\\": \\\"ISO 4217 3-letter code (e.g. USD, AUD, GBP), or null if genuinely ambiguous/not statable\\\", \\\"category\\\": \\\"one of: food, travel, transport, software, office, entertainment, groceries, utilities, health, other\\\", \\\"needs_review\\\": boolean (true if merchant, amount or currency could not be determined confidently; false if the input was clear and complete) }  Rules: - If no date is mentioned, set date to null (caller will default to today). Do not guess a date. - Never guess a currency if it is not stated or strongly implied (a bare currency symbol with no other context is ambiguous - if genuinely unclear, set currency to null and needs_review true). - Accuracy matters more than completeness - this is money data. - Resolve relative date words (today, yesterday, last Monday, etc.) into an absolute YYYY-MM-DD date using the reference date supplied in the user context. Do not leave a relative date as null.\" + ' Reference date (today) is ' + $now.format('yyyy-MM-dd') + '.' }, { role: 'user', content: $json.body.text } ] }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "gFrxmn3O73lcQA1u",
+          "name": "Xiaomi Mimo"
+        }
+      }
+    },
+    {
+      "id": "build-expense-01",
+      "name": "Build Expense",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst webhookBody = $('Webhook').first().json.body || {};\nconst rawText = webhookBody.text || '';\nconst source = webhookBody.source || 'web';\n\nlet parsed = {};\nlet parseError = null;\ntry {\n  const content = input.choices[0].message.content;\n  const cleaned = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parseError = e.message;\n}\n\nconst today = new Date().toISOString().split('T')[0];\nconst date = (parsed.date && /^\\d{4}-\\d{2}-\\d{2}$/.test(parsed.date)) ? parsed.date : today;\nconst merchant = (parsed.merchant && String(parsed.merchant).trim()) || 'Unknown merchant';\nconst amount = (typeof parsed.amount === 'number' && isFinite(parsed.amount)) ? parsed.amount : 0;\nconst currency = (parsed.currency && /^[A-Z]{3}$/.test(parsed.currency)) ? parsed.currency : 'USD';\nconst category = (parsed.category && String(parsed.category).trim()) || 'uncategorized';\n\nconst needsReview = Boolean(\n  parseError ||\n  parsed.needs_review === true ||\n  !parsed.merchant ||\n  typeof parsed.amount !== 'number' ||\n  !parsed.currency\n);\n\nreturn [{\n  json: {\n    submitted_at: new Date().toISOString(),\n    date,\n    merchant,\n    amount,\n    currency,\n    category,\n    source,\n    raw_text: rawText,\n    receipt_ref: '',\n    status: needsReview ? 'needs_review' : 'ok',\n    parsed_by: parseError ? 'mimo-v2.5-pro' : 'mimo-v2.5-pro',\n  },\n}];"
+      }
+    },
+    {
+      "id": "hash-id-01",
+      "name": "Hash ID",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        780,
+        0
+      ],
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}|{{ $json.currency }}|{{ $json.submitted_at }}",
+        "dataPropertyName": "expense_id"
+      }
+    },
+    {
+      "id": "insert-row-01",
+      "name": "Insert Expense Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        0
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mmPrm3HUtRron4zX"
+        },
+        "operation": "insert",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "expense_id": "={{ $json.expense_id }}",
+            "submitted_at": "={{ $json.submitted_at }}",
+            "date": "={{ $json.date }}",
+            "merchant": "={{ $json.merchant }}",
+            "amount": "={{ $json.amount }}",
+            "currency": "={{ $json.currency }}",
+            "category": "={{ $json.category }}",
+            "source": "={{ $json.source }}",
+            "raw_text": "={{ $json.raw_text }}",
+            "receipt_ref": "={{ $json.receipt_ref }}",
+            "status": "={{ $json.status }}",
+            "parsed_by": "={{ $json.parsed_by }}"
+          },
+          "schema": [
+            {
+              "id": "expense_id",
+              "displayName": "expense_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "merchant",
+              "displayName": "merchant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "amount",
+              "displayName": "amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "raw_text",
+              "displayName": "raw_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "receipt_ref",
+              "displayName": "receipt_ref",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "parsed_by",
+              "displayName": "parsed_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "respond-01",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ id: $json.expense_id, submitted_at: $json.submitted_at, date: $json.date, merchant: $json.merchant, amount: $json.amount, currency: $json.currency, category: $json.category, source: $json.source, raw_text: $json.raw_text, receipt_ref: $json.receipt_ref, status: $json.status, parsed_by: $json.parsed_by }) }}",
+        "options": {
+          "responseCode": 201,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Mimo Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mimo Parse": {
+      "main": [
+        [
+          {
+            "node": "Build Expense",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Expense": {
+      "main": [
+        [
+          {
+            "node": "Hash ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hash ID": {
+      "main": [
+        [
+          {
+            "node": "Insert Expense Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Expense Row": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": null,
+  "meta": null,
+  "tags": [],
+  "activeVersion": {
+    "versionId": "bdd647b9-a231-4d53-bb41-6b7e34325f9e",
+    "workflowId": "by34dMA7MsYkasqC",
+    "nodes": [
+      {
+        "id": "webhook-01",
+        "name": "Webhook",
+        "webhookId": "expense-submit-wh-01",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "expense-submit",
+          "responseMode": "responseNode",
+          "options": {
+            "allowedOrigins": "*"
+          }
+        }
+      },
+      {
+        "id": "mimo-parse-01",
+        "name": "Mimo Parse",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "onError": "continueRegularOutput",
+        "position": [
+          260,
+          0
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "openAiApi",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ model: 'mimo-v2.5-pro', temperature: 0.1, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: \"You are an expense-parsing assistant for a personal/business expense tracker. Given free-text describing an expense (may be informal, like a receipt summary or a quick note), extract structured data.  Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape: { \\\"date\\\": \\\"YYYY-MM-DD or null if not stated (will default to today)\\\", \\\"merchant\\\": \\\"string, the vendor/payee name\\\", \\\"amount\\\": number (numeric value only, no currency symbol), \\\"currency\\\": \\\"ISO 4217 3-letter code (e.g. USD, AUD, GBP), or null if genuinely ambiguous/not statable\\\", \\\"category\\\": \\\"one of: food, travel, transport, software, office, entertainment, groceries, utilities, health, other\\\", \\\"needs_review\\\": boolean (true if merchant, amount or currency could not be determined confidently; false if the input was clear and complete) }  Rules: - If no date is mentioned, set date to null (caller will default to today). Do not guess a date. - Never guess a currency if it is not stated or strongly implied (a bare currency symbol with no other context is ambiguous - if genuinely unclear, set currency to null and needs_review true). - Accuracy matters more than completeness - this is money data. - Resolve relative date words (today, yesterday, last Monday, etc.) into an absolute YYYY-MM-DD date using the reference date supplied in the user context. Do not leave a relative date as null.\" + ' Reference date (today) is ' + $now.format('yyyy-MM-dd') + '.' }, { role: 'user', content: $json.body.text } ] }) }}",
+          "options": {}
+        },
+        "credentials": {
+          "openAiApi": {
+            "id": "gFrxmn3O73lcQA1u",
+            "name": "Xiaomi Mimo"
+          }
+        }
+      },
+      {
+        "id": "build-expense-01",
+        "name": "Build Expense",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          520,
+          0
+        ],
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst webhookBody = $('Webhook').first().json.body || {};\nconst rawText = webhookBody.text || '';\nconst source = webhookBody.source || 'web';\n\nlet parsed = {};\nlet parseError = null;\ntry {\n  const content = input.choices[0].message.content;\n  const cleaned = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parseError = e.message;\n}\n\nconst today = new Date().toISOString().split('T')[0];\nconst date = (parsed.date && /^\\d{4}-\\d{2}-\\d{2}$/.test(parsed.date)) ? parsed.date : today;\nconst merchant = (parsed.merchant && String(parsed.merchant).trim()) || 'Unknown merchant';\nconst amount = (typeof parsed.amount === 'number' && isFinite(parsed.amount)) ? parsed.amount : 0;\nconst currency = (parsed.currency && /^[A-Z]{3}$/.test(parsed.currency)) ? parsed.currency : 'USD';\nconst category = (parsed.category && String(parsed.category).trim()) || 'uncategorized';\n\nconst needsReview = Boolean(\n  parseError ||\n  parsed.needs_review === true ||\n  !parsed.merchant ||\n  typeof parsed.amount !== 'number' ||\n  !parsed.currency\n);\n\nreturn [{\n  json: {\n    submitted_at: new Date().toISOString(),\n    date,\n    merchant,\n    amount,\n    currency,\n    category,\n    source,\n    raw_text: rawText,\n    receipt_ref: '',\n    status: needsReview ? 'needs_review' : 'ok',\n    parsed_by: parseError ? 'mimo-v2.5-pro' : 'mimo-v2.5-pro',\n  },\n}];"
+        }
+      },
+      {
+        "id": "hash-id-01",
+        "name": "Hash ID",
+        "type": "n8n-nodes-base.crypto",
+        "typeVersion": 1,
+        "position": [
+          780,
+          0
+        ],
+        "parameters": {
+          "action": "hash",
+          "type": "SHA256",
+          "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}|{{ $json.currency }}|{{ $json.submitted_at }}",
+          "dataPropertyName": "expense_id"
+        }
+      },
+      {
+        "id": "insert-row-01",
+        "name": "Insert Expense Row",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1.1,
+        "position": [
+          1040,
+          0
+        ],
+        "parameters": {
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "mmPrm3HUtRron4zX"
+          },
+          "operation": "insert",
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "expense_id": "={{ $json.expense_id }}",
+              "submitted_at": "={{ $json.submitted_at }}",
+              "date": "={{ $json.date }}",
+              "merchant": "={{ $json.merchant }}",
+              "amount": "={{ $json.amount }}",
+              "currency": "={{ $json.currency }}",
+              "category": "={{ $json.category }}",
+              "source": "={{ $json.source }}",
+              "raw_text": "={{ $json.raw_text }}",
+              "receipt_ref": "={{ $json.receipt_ref }}",
+              "status": "={{ $json.status }}",
+              "parsed_by": "={{ $json.parsed_by }}"
+            },
+            "schema": [
+              {
+                "id": "expense_id",
+                "displayName": "expense_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "submitted_at",
+                "displayName": "submitted_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "date",
+                "displayName": "date",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "merchant",
+                "displayName": "merchant",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "amount",
+                "displayName": "amount",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "currency",
+                "displayName": "currency",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "category",
+                "displayName": "category",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "source",
+                "displayName": "source",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "raw_text",
+                "displayName": "raw_text",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "receipt_ref",
+                "displayName": "receipt_ref",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "status",
+                "displayName": "status",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "parsed_by",
+                "displayName": "parsed_by",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              }
+            ]
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "respond-01",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          1300,
+          0
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ id: $json.expense_id, submitted_at: $json.submitted_at, date: $json.date, merchant: $json.merchant, amount: $json.amount, currency: $json.currency, category: $json.category, source: $json.source, raw_text: $json.raw_text, receipt_ref: $json.receipt_ref, status: $json.status, parsed_by: $json.parsed_by }) }}",
+          "options": {
+            "responseCode": 201,
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Mimo Parse",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Mimo Parse": {
+        "main": [
+          [
+            {
+              "node": "Build Expense",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Expense": {
+        "main": [
+          [
+            {
+              "node": "Hash ID",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Hash ID": {
+        "main": [
+          [
+            {
+              "node": "Insert Expense Row",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Insert Expense Row": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Bryan Dadiz",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "createdAt": "2026-10-15T01:52:44.195Z",
+    "updatedAt": "2026-10-15T01:52:44.195Z",
+    "workflowPublishHistory": [
+      {
+        "id": 378,
+        "workflowId": "by34dMA7MsYkasqC",
+        "versionId": "bdd647b9-a231-4d53-bb41-6b7e34325f9e",
+        "event": "activated",
+        "userId": "c9bd64a9-b07f-4318-8ae0-5dc5e7d42c09",
+        "createdAt": "2026-10-15T01:52:44.423Z"
+      }
+    ]
+  }
+}
