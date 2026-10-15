@@ -74,7 +74,7 @@
       "parameters": {
         "action": "hash",
         "type": "SHA256",
-        "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}",
+        "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}|{{ $json.currency || 'UNKNOWN' }}",
         "dataPropertyName": "expense_id"
       }
     },
@@ -325,7 +325,7 @@
   "meta": null,
   "tags": [],
   "activeVersion": {
-    "versionId": "f3c4268e-3b2c-4d92-8243-4720baea4570",
+    "versionId": "3a3a6f60-fa30-4c10-ad08-0b50dc892b51",
     "workflowId": "by34dMA7MsYkasqC",
     "nodes": [
       {
@@ -399,7 +399,7 @@
         "parameters": {
           "action": "hash",
           "type": "SHA256",
-          "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}",
+          "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}|{{ $json.currency || 'UNKNOWN' }}",
           "dataPropertyName": "expense_id"
         }
       },
@@ -646,16 +646,16 @@
     "name": null,
     "description": null,
     "autosaved": false,
-    "createdAt": "2026-10-15T02:01:56.241Z",
-    "updatedAt": "2026-10-15T02:01:56.241Z",
+    "createdAt": "2026-10-15T02:05:30.992Z",
+    "updatedAt": "2026-10-15T02:05:30.992Z",
     "workflowPublishHistory": [
       {
-        "id": 382,
+        "id": 384,
         "workflowId": "by34dMA7MsYkasqC",
-        "versionId": "f3c4268e-3b2c-4d92-8243-4720baea4570",
+        "versionId": "3a3a6f60-fa30-4c10-ad08-0b50dc892b51",
         "event": "activated",
         "userId": "c9bd64a9-b07f-4318-8ae0-5dc5e7d42c09",
-        "createdAt": "2026-10-15T02:01:56.333Z"
+        "createdAt": "2026-10-15T02:05:31.060Z"
       }
     ]
   }
