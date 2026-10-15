@@ -39,7 +39,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'mimo-v2.5-pro', temperature: 0.1, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: \"You are an expense-parsing assistant for a personal/business expense tracker. Given free-text describing an expense (may be informal, like a receipt summary or a quick note), extract structured data.  Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape: { \\\"date\\\": \\\"YYYY-MM-DD or null if not stated (will default to today)\\\", \\\"merchant\\\": \\\"string, the vendor/payee name\\\", \\\"amount\\\": number (numeric value only, no currency symbol), \\\"currency\\\": \\\"ISO 4217 3-letter code (e.g. USD, AUD, GBP), or null if genuinely ambiguous/not statable\\\", \\\"category\\\": \\\"one of: food, travel, transport, software, office, entertainment, groceries, utilities, health, other\\\", \\\"needs_review\\\": boolean (true if merchant, amount or currency could not be determined confidently; false if the input was clear and complete) }  Rules: - If no date is mentioned, set date to null (caller will default to today). Do not guess a date. - Never guess a currency if it is not stated or strongly implied (a bare currency symbol with no other context is ambiguous - if genuinely unclear, set currency to null and needs_review true). - Accuracy matters more than completeness - this is money data. - Resolve relative date words (today, yesterday, last Monday, etc.) into an absolute YYYY-MM-DD date using the reference date supplied in the user context. Do not leave a relative date as null.\" + ' Reference date (today) is ' + $now.format('yyyy-MM-dd') + '.' }, { role: 'user', content: $json.body.text } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: 'mimo-v2.5-pro', temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: \"You are an expense-parsing assistant for a personal/business expense tracker. Given free-text describing an expense (may be informal, like a receipt summary or a quick note), extract structured data.  Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape: { \\\"date\\\": \\\"YYYY-MM-DD or null if not stated (will default to today)\\\", \\\"merchant\\\": \\\"string, the vendor/payee name\\\", \\\"amount\\\": number (numeric value only, no currency symbol), \\\"currency\\\": \\\"ISO 4217 3-letter code (e.g. USD, AUD, GBP), or null if genuinely ambiguous/not statable\\\", \\\"category\\\": \\\"one of: food, travel, transport, software, office, entertainment, groceries, utilities, health, other\\\", \\\"needs_review\\\": boolean (true if merchant, amount or currency could not be determined confidently; false if the input was clear and complete) }  Rules: - If no date is mentioned, set date to null (caller will default to today). Do not guess a date. - Never guess a currency if it is not stated or strongly implied (a bare currency symbol with no other context is ambiguous - if genuinely unclear, set currency to null and needs_review true). - Accuracy matters more than completeness - this is money data. - Resolve relative date words (today, yesterday, last Monday, etc.) into an absolute YYYY-MM-DD date using the reference date supplied in the user context. Do not leave a relative date as null.\" + ' Reference date (today) is ' + $now.format('yyyy-MM-dd') + '.' }, { role: 'user', content: $json.body.text } ] }) }}",
         "options": {}
       },
       "credentials": {
@@ -74,7 +74,7 @@
       "parameters": {
         "action": "hash",
         "type": "SHA256",
-        "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}|{{ $json.currency }}",
+        "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}",
         "dataPropertyName": "expense_id"
       }
     },
@@ -325,7 +325,7 @@
   "meta": null,
   "tags": [],
   "activeVersion": {
-    "versionId": "eb1dadf0-a316-4695-9d34-864a09ac1976",
+    "versionId": "f3c4268e-3b2c-4d92-8243-4720baea4570",
     "workflowId": "by34dMA7MsYkasqC",
     "nodes": [
       {
@@ -364,7 +364,7 @@
           "nodeCredentialType": "openAiApi",
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ model: 'mimo-v2.5-pro', temperature: 0.1, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: \"You are an expense-parsing assistant for a personal/business expense tracker. Given free-text describing an expense (may be informal, like a receipt summary or a quick note), extract structured data.  Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape: { \\\"date\\\": \\\"YYYY-MM-DD or null if not stated (will default to today)\\\", \\\"merchant\\\": \\\"string, the vendor/payee name\\\", \\\"amount\\\": number (numeric value only, no currency symbol), \\\"currency\\\": \\\"ISO 4217 3-letter code (e.g. USD, AUD, GBP), or null if genuinely ambiguous/not statable\\\", \\\"category\\\": \\\"one of: food, travel, transport, software, office, entertainment, groceries, utilities, health, other\\\", \\\"needs_review\\\": boolean (true if merchant, amount or currency could not be determined confidently; false if the input was clear and complete) }  Rules: - If no date is mentioned, set date to null (caller will default to today). Do not guess a date. - Never guess a currency if it is not stated or strongly implied (a bare currency symbol with no other context is ambiguous - if genuinely unclear, set currency to null and needs_review true). - Accuracy matters more than completeness - this is money data. - Resolve relative date words (today, yesterday, last Monday, etc.) into an absolute YYYY-MM-DD date using the reference date supplied in the user context. Do not leave a relative date as null.\" + ' Reference date (today) is ' + $now.format('yyyy-MM-dd') + '.' }, { role: 'user', content: $json.body.text } ] }) }}",
+          "jsonBody": "={{ JSON.stringify({ model: 'mimo-v2.5-pro', temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: \"You are an expense-parsing assistant for a personal/business expense tracker. Given free-text describing an expense (may be informal, like a receipt summary or a quick note), extract structured data.  Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape: { \\\"date\\\": \\\"YYYY-MM-DD or null if not stated (will default to today)\\\", \\\"merchant\\\": \\\"string, the vendor/payee name\\\", \\\"amount\\\": number (numeric value only, no currency symbol), \\\"currency\\\": \\\"ISO 4217 3-letter code (e.g. USD, AUD, GBP), or null if genuinely ambiguous/not statable\\\", \\\"category\\\": \\\"one of: food, travel, transport, software, office, entertainment, groceries, utilities, health, other\\\", \\\"needs_review\\\": boolean (true if merchant, amount or currency could not be determined confidently; false if the input was clear and complete) }  Rules: - If no date is mentioned, set date to null (caller will default to today). Do not guess a date. - Never guess a currency if it is not stated or strongly implied (a bare currency symbol with no other context is ambiguous - if genuinely unclear, set currency to null and needs_review true). - Accuracy matters more than completeness - this is money data. - Resolve relative date words (today, yesterday, last Monday, etc.) into an absolute YYYY-MM-DD date using the reference date supplied in the user context. Do not leave a relative date as null.\" + ' Reference date (today) is ' + $now.format('yyyy-MM-dd') + '.' }, { role: 'user', content: $json.body.text } ] }) }}",
           "options": {}
         },
         "credentials": {
@@ -399,7 +399,7 @@
         "parameters": {
           "action": "hash",
           "type": "SHA256",
-          "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}|{{ $json.currency }}",
+          "value": "={{ $json.date }}|{{ $json.merchant }}|{{ $json.amount }}",
           "dataPropertyName": "expense_id"
         }
       },
@@ -646,16 +646,16 @@
     "name": null,
     "description": null,
     "autosaved": false,
-    "createdAt": "2026-10-15T01:57:56.633Z",
-    "updatedAt": "2026-10-15T01:57:56.633Z",
+    "createdAt": "2026-10-15T02:01:56.241Z",
+    "updatedAt": "2026-10-15T02:01:56.241Z",
     "workflowPublishHistory": [
       {
-        "id": 380,
+        "id": 382,
         "workflowId": "by34dMA7MsYkasqC",
-        "versionId": "eb1dadf0-a316-4695-9d34-864a09ac1976",
+        "versionId": "f3c4268e-3b2c-4d92-8243-4720baea4570",
         "event": "activated",
         "userId": "c9bd64a9-b07f-4318-8ae0-5dc5e7d42c09",
-        "createdAt": "2026-10-15T01:57:56.707Z"
+        "createdAt": "2026-10-15T02:01:56.333Z"
       }
     ]
   }
